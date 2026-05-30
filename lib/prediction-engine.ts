@@ -80,7 +80,7 @@ export function computeSkipRisk({ logs, targetDate }: PredictionInput): Predicti
 
   const energyReadings = recentLogs
     .map(l => l.energy_level)
-    .filter((e): e is number => e !== null)
+    .filter((e): e is number => typeof e === 'number')
 
   const avgEnergy = energyReadings.length === 0
     ? 3  // neutral
