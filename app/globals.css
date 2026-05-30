@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-body: 'DM Sans', sans-serif;
+    --font-display: 'DM Serif Display', serif;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Smooth scrolling */
+  html, body {
+    scroll-behavior: smooth;
+  }
+
+  /* Remove default button styles */
+  button {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  /* Card surface */
+  .card {
+    @apply bg-ink-800 border border-ink-600/40 rounded-2xl;
+  }
+
+  /* Teal accent button */
+  .btn-primary {
+    @apply bg-teal-400 text-ink-900 font-body font-medium
+           px-5 py-3 rounded-xl
+           hover:bg-teal-200 active:scale-95
+           transition-all duration-150
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400;
+  }
+
+  /* Ghost button */
+  .btn-ghost {
+    @apply border border-ink-600/60 text-ink-200
+           px-5 py-3 rounded-xl
+           hover:bg-ink-800 active:scale-95
+           transition-all duration-150
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink-400;
+  }
+
+  /* Input field */
+  .input {
+    @apply w-full bg-ink-800 border border-ink-600/60
+           text-ink-50 placeholder-ink-400
+           rounded-xl px-4 py-3
+           focus:outline-none focus:border-teal-400
+           transition-colors duration-150;
+  }
+
+  /* Section label */
+  .section-label {
+    @apply text-xs font-medium tracking-widest uppercase text-ink-400;
+  }
+
+  /* Habit log button — the big tap target */
+  .log-btn {
+    @apply w-full flex items-center gap-4 p-4 rounded-2xl
+           border-2 transition-all duration-150 active:scale-98
+           select-none cursor-pointer;
+  }
+
+  /* Consistency ring container */
+  .ring-track {
+    @apply text-ink-600/40;
+  }
+  .ring-fill {
+    @apply text-teal-400 transition-all duration-700 ease-out;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+  .font-body {
+    font-family: var(--font-body);
+  }
+  /* Safe area for mobile PWA */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* PWA splash screen fade-in */
+@media (display-mode: standalone) {
+  body {
+    animation: fadeIn 0.3s ease;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
