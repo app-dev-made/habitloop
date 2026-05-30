@@ -54,9 +54,13 @@ export function computeSkipRisk({ logs, targetDate }: PredictionInput): Predicti
     logMap.get(dateStr(subDays(targetDate, i + 1)))
   ).filter((l): l is HabitLog => l !== undefined)
  
-  const energyReadings: number[] = recentLogs
-    .map(l => l.energy_level)
-    .filter((e): e is number => typeof e === 'number')
+  const energyReadings: number[] = []
+  for (const l of recentLogs) {
+    const e = l.energy_level
+    if (e !== null && e !== undefined) {
+      energyReadings.push(Number(e))
+    }
+  }
  
   const avgEnergy = energyReadings.length === 0
     ? 3
