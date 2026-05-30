@@ -1,11 +1,11 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
-import { last30Days, computeConsistency, CATEGORIES } from '@/lib/habits'
+import { last30Days, computeConsistency } from '@/lib/habits'
 import { format, subDays, getDay } from 'date-fns'
 import InsightsClient from '@/components/dashboard/InsightsClient'
 
 export default async function InsightsPage() {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
@@ -17,16 +17,14 @@ export default async function InsightsPage() {
   ])
 
   const habits = habitsRes.data ?? []
-  const logs   = logsRes.data ?? []
+  const logs = logsRes.data ?? []
 
-  // Build per-habit consistency scores
   const habitsWithStats = habits.map(habit => {
     const habitLogs = logs.filter(l => l.habit_id === habit.id)
     const consistency = computeConsistency(habitLogs, habit.target_frequency)
     return { ...habit, consistency_30d: consistency }
   })
 
-  // Build 30-day chart data
   const days = last30Days()
   const chartData = days.map(date => {
     const dayLogs = logs.filter(l => l.date === date)
@@ -41,7 +39,6 @@ export default async function InsightsPage() {
     }
   })
 
-  // Day-of-week success rates
   const dowLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
   const dowStats = dowLabels.map((label, dow) => {
     const dowLogs = logs.filter(l => getDay(new Date(l.date + 'T12:00:00')) === dow)
@@ -50,11 +47,5 @@ export default async function InsightsPage() {
     return { label, rate, total: dowLogs.length }
   })
 
-  return (
-    <InsightsClient
-      habits={habitsWithStats}
-      chartData={chartData}
-      dowStats={dowStats}
-    />
-  )
+  return <InsightsClient habits={habitsWithStats} chartData={chartData} dowStats={dowStats} />
 }

@@ -6,41 +6,23 @@ import TodayView from '@/components/dashboard/TodayView'
 import DashboardNav from '@/components/dashboard/DashboardNav'
 
 export default async function DashboardPage() {
-  const supabase = createServerSupabaseClient()
+  const supabase = await createServerSupabaseClient()
 
-  // Auth guard
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/auth/login')
 
   const todayStr = today()
 
-  // Load habits + today's logs in parallel
   const [habitsRes, logsRes, predictionsRes] = await Promise.all([
-    supabase
-      .from('habits')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('active', true)
-      .order('created_at', { ascending: true }),
-
-    supabase
-      .from('habit_logs')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('date', todayStr),
-
-    supabase
-      .from('predictions')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('date', todayStr),
+    supabase.from('habits').select('*').eq('user_id', user.id).eq('active', true).order('created_at', { ascending: true }),
+    supabase.from('habit_logs').select('*').eq('user_id', user.id).eq('date', todayStr),
+    supabase.from('predictions').select('*').eq('user_id', user.id).eq('date', todayStr),
   ])
 
   const habits: Habit[] = habitsRes.data ?? []
   const logs: HabitLog[] = logsRes.data ?? []
   const predictions = predictionsRes.data ?? []
 
-  // Merge today's log and skip risk into each habit
   const habitsWithData = habits.map(habit => ({
     ...habit,
     today_log: logs.find(l => l.habit_id === habit.id) ?? null,

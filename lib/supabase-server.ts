@@ -1,9 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 
-// Call this in Server Components, Server Actions, and Route Handlers
-export function createServerSupabaseClient() {
-  const cookieStore = cookies()
+export async function createServerSupabaseClient() {
+  const cookieStore = await cookies()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,7 +18,7 @@ export function createServerSupabaseClient() {
               cookieStore.set(name, value, options)
             )
           } catch {
-            // Called from a Server Component — safe to ignore
+            // Called from Server Component — safe to ignore
           }
         },
       },

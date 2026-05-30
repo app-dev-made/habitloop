@@ -1,5 +1,3 @@
-// ─── Database row types (match Supabase schema exactly) ───────────────────────
-
 export type HabitCategory =
   | 'health'
   | 'fitness'
@@ -35,25 +33,24 @@ export interface Habit {
   user_id: string
   name: string
   category: HabitCategory
-  target_frequency: number   // times per week (1–7)
-  target_time: string | null // preferred time e.g. "07:30"
-  difficulty: 1 | 2 | 3 | 4 | 5
+  target_frequency: number
+  target_time: string | null
+  difficulty: number
   active: boolean
   created_at: string
-  // joined fields
   today_log?: HabitLog | null
-  consistency_30d?: number   // 0–100 percentage
-  skip_risk?: number         // 0–100 score from prediction engine
+  consistency_30d?: number
+  skip_risk?: number | null
 }
 
 export interface HabitLog {
   id: string
   habit_id: string
   user_id: string
-  date: string              // YYYY-MM-DD
+  date: string
   status: LogStatus
   skip_reason: SkipReason | null
-  energy_level: 1 | 2 | 3 | 4 | 5 | null
+  energy_level: number | null
   logged_at: string
 }
 
@@ -62,7 +59,7 @@ export interface Prediction {
   habit_id: string
   user_id: string
   date: string
-  skip_risk_score: number   // 0–100
+  skip_risk_score: number
   nudge_sent: boolean
   model_version: string
 }
@@ -71,24 +68,20 @@ export interface UserPattern {
   id: string
   user_id: string
   habit_id: string
-  best_day_of_week: number | null   // 0 = Sunday
+  best_day_of_week: number | null
   best_time_slot: string | null
   avg_consistency_30d: number
   last_computed_at: string
 }
-
-// ─── API response types ────────────────────────────────────────────────────────
 
 export interface ApiResponse<T> {
   data: T | null
   error: string | null
 }
 
-// ─── UI-only types ─────────────────────────────────────────────────────────────
-
 export interface WeekDay {
-  date: string       // YYYY-MM-DD
-  label: string      // "Mon"
+  date: string
+  label: string
   isToday: boolean
-  logs: Record<string, LogStatus>  // habit_id → status
+  logs: Record<string, LogStatus>
 }
