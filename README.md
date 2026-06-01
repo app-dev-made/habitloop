@@ -9,7 +9,7 @@ HabitLoop goes beyond streak tracking — it learns your personal behavioral pat
 ## ✦ Features
 
 - **One-tap logging** — tap to cycle done → partial → skipped
-- **Skip prediction engine** — logistic regression model per habit, trained on your data
+- **Skip prediction engine** — logistic regression model per habit, trained on your data and statistics
 - **Proactive nudges** — smart notifications before you fail, not after
 - **Difficulty scaling** — auto-suggests a smaller habit when you're struggling
 - **Insights dashboard** — 30-day charts, day-of-week success rates, per-habit consistency
