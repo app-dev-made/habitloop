@@ -5,30 +5,29 @@ import type { User } from '@supabase/supabase-js'
 import Link from 'next/link'
 
 export default function DashboardNav({ user }: { user: User }) {
-  const greeting = (() => {
-    const h = new Date().getHours()
-    if (h < 12) return 'Good morning'
-    if (h < 17) return 'Good afternoon'
-    return 'Good evening'
-  })()
+  const hour = new Date().getHours()
+  const greeting = hour < 5 ? 'Still up?' : hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : hour < 21 ? 'Good evening' : 'Good night'
+  const greetingEmoji = hour < 5 ? '🌙' : hour < 12 ? '☀️' : hour < 17 ? '⚡' : hour < 21 ? '🌇' : '🌙'
+  const name = (user.user_metadata?.name || user.email?.split('@')[0] || 'there') as string
+  const initial = name.charAt(0).toUpperCase()
 
   return (
-    <header className="safe-top px-6 pt-6 pb-4 flex items-start justify-between">
+    <header className="pwa-header px-5 pb-4 flex items-start justify-between">
       <div>
-        <p className="section-label mb-1">{format(new Date(), 'EEEE, MMM d')}</p>
-        <h1 className="font-display text-2xl text-ink-50">
-          {greeting}
+        <p className="section-label mb-1">{format(new Date(), 'EEEE, MMMM d')}</p>
+        <h1 className="font-display leading-tight" style={{ fontSize: 28, color: 'var(--text-primary)' }}>
+          {greetingEmoji} {greeting},
+        </h1>
+        <h1 className="font-display leading-tight gradient-text" style={{ fontSize: 28 }}>
+          {name.charAt(0).toUpperCase() + name.slice(1)}
         </h1>
       </div>
       <Link
         href="/dashboard/settings"
-        className="w-9 h-9 rounded-full bg-ink-800 border border-ink-600/40 flex items-center justify-center text-ink-300 hover:text-teal-400 hover:border-teal-400/40 transition-colors"
-        title="Settings"
+        className="mt-2 w-10 h-10 rounded-2xl flex items-center justify-center font-bold text-ink-900 bg-teal-400 text-sm hover:bg-teal-200 transition-colors active:scale-90"
+        aria-label="Settings"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-          <circle cx="8" cy="8" r="2.5"/>
-          <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41"/>
-        </svg>
+        {initial}
       </Link>
     </header>
   )

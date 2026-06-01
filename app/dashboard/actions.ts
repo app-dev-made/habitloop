@@ -19,19 +19,18 @@ export async function logHabit({
   energyLevel?: number
 }) {
   const supabase = await createServerSupabaseClient()
-  const todayStr = today()
 
   const { error } = await supabase
     .from('habit_logs')
     .upsert(
       {
-        habit_id: habitId,
-        user_id: userId,
-        date: todayStr,
+        habit_id:     habitId,
+        user_id:      userId,
+        date:         today(),
         status,
-        skip_reason: skipReason ?? null,
+        skip_reason:  skipReason ?? null,
         energy_level: energyLevel ?? null,
-        logged_at: new Date().toISOString(),
+        logged_at:    new Date().toISOString(),
       },
       { onConflict: 'habit_id,date' }
     )
@@ -61,13 +60,13 @@ export async function createHabit({
   const { data, error } = await supabase
     .from('habits')
     .insert({
-      user_id: userId,
+      user_id:          userId,
       name,
       category,
       target_frequency: targetFrequency,
-      target_time: targetTime,
+      target_time:      targetTime,
       difficulty,
-      active: true,
+      active:           true,
     })
     .select()
     .single()
