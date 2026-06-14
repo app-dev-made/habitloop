@@ -65,7 +65,7 @@ export default function HabitManagerClient({ habits: initial, userId }: Props) {
       {/* Toast */}
       {toast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-fade-up pointer-events-none">
-          <div className="bg-teal-400 text-ink-900 px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-2xl">{toast}</div>
+          <div className="px-4 py-2.5 rounded-2xl text-sm font-semibold shadow-2xl bg-teal-400 text-ink-900">{toast}</div>
         </div>
       )}
 
@@ -96,7 +96,7 @@ export default function HabitManagerClient({ habits: initial, userId }: Props) {
                         <button
                           key={key}
                           onClick={() => setEditCategory(key)}
-                          className={`py-1.5 rounded-lg border text-xs flex flex-col items-center transition-all ${editCategory === key ? 'border-teal-400 bg-teal-400/10' : 'border-ink-600/30'}`}
+                          className={`py-1.5 rounded-lg border text-xs flex flex-col items-center transition-all ${editCategory === key ? 'border-teal-400 bg-teal-400/10' : ''}`}
                         >
                           <span>{c.emoji}</span>
                         </button>
@@ -105,7 +105,7 @@ export default function HabitManagerClient({ habits: initial, userId }: Props) {
                     {/* Frequency */}
                     <div className="flex gap-2">
                       {[1,3,5,7].map(f => (
-                        <button key={f} onClick={() => setEditFreq(f)} className={`flex-1 py-2 rounded-lg border text-xs transition-all ${editFreq === f ? 'border-teal-400 bg-teal-400/10 text-teal-300' : 'border-ink-600/30 text-ink-400'}`}>
+                        <button key={f} onClick={() => setEditFreq(f)} className={`flex-1 py-2 rounded-lg border text-xs transition-all ${editFreq === f ? 'border-teal-400 bg-teal-400/10 text-teal-300' : ' text-ink-400'}`}>
                           {f === 7 ? 'Daily' : `${f}×`}
                         </button>
                       ))}

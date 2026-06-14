@@ -1,31 +1,90 @@
 {
-  "name": "HabitLoop — Build Habits That Stick",
+  "name": "HabitLoop \u2014 Build Habits That Stick",
   "short_name": "HabitLoop",
   "description": "Predictive habit coaching. One tap to log, smart nudges before you slip.",
   "start_url": "/dashboard",
   "id": "/dashboard",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
   "background_color": "#0F0E0C",
   "theme_color": "#1D9E75",
   "orientation": "portrait-primary",
   "scope": "/",
   "lang": "en-US",
   "dir": "ltr",
-  "categories": ["health", "lifestyle", "productivity"],
+  "categories": [
+    "health",
+    "lifestyle",
+    "productivity",
+    "utilities"
+  ],
   "iarc_rating_id": "",
   "prefer_related_applications": false,
   "icons": [
-    { "src": "/icons/icon-48.png",   "sizes": "48x48",   "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-72.png",   "sizes": "72x72",   "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-96.png",   "sizes": "96x96",   "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-128.png",  "sizes": "128x128", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-144.png",  "sizes": "144x144", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-152.png",  "sizes": "152x152", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-192.png",  "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icons/icon-256.png",  "sizes": "256x256", "type": "image/png", "purpose": "any" },
-    { "src": "/icons/icon-512.png",  "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
-    { "src": "/icons/icon-1024.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }
+    {
+      "src": "/icons/icon-48.png",
+      "sizes": "48x48",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-256.png",
+      "sizes": "256x256",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-1024.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
   ],
   "screenshots": [
     {
@@ -33,14 +92,14 @@
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "HabitLoop Dashboard"
+      "label": "HabitLoop \u2014 Today's habit dashboard with one-tap logging"
     },
     {
       "src": "/screenshots/insights.png",
       "sizes": "390x844",
       "type": "image/png",
       "form_factor": "narrow",
-      "label": "HabitLoop Insights"
+      "label": "HabitLoop \u2014 Insights with heatmap and charts"
     }
   ],
   "shortcuts": [
@@ -49,23 +108,40 @@
       "short_name": "Log",
       "description": "Quick-log your habits for today",
       "url": "/dashboard?action=log",
-      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+      "icons": [
+        {
+          "src": "/icons/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
     },
     {
       "name": "View Insights",
       "short_name": "Insights",
       "description": "See your habit patterns",
       "url": "/dashboard/insights",
-      "icons": [{ "src": "/icons/icon-96.png", "sizes": "96x96" }]
+      "icons": [
+        {
+          "src": "/icons/icon-96.png",
+          "sizes": "96x96"
+        }
+      ]
     }
   ],
   "share_target": {
     "action": "/dashboard",
     "method": "GET",
-    "params": { "title": "title", "text": "text", "url": "url" }
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
   },
   "protocol_handlers": [],
   "file_handlers": [],
   "related_applications": [],
-  "edge_side_panel": { "preferred_width": 480 }
+  "edge_side_panel": {
+    "preferred_width": 480
+  },
+  "version": "1.0.0"
 }

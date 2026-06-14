@@ -1,285 +1,673 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import type { Habit, LogStatus } from '@/types'
 import { riskLabel, CATEGORIES } from '@/lib/habits'
 import { logHabit, archiveHabit } from '@/app/dashboard/actions'
 import ConsistencyRing from '@/components/habits/ConsistencyRing'
 import AddHabitModal from '@/components/habits/AddHabitModal'
 import HabitCard from '@/components/habits/HabitCard'
+import NoteModal from '@/components/habits/NoteModal'
 import Confetti from '@/components/ui/Confetti'
 import InstallBanner from '@/components/ui/InstallBanner'
 import Link from 'next/link'
 
 interface Props {
-  habits: (Habit & { today_log: any; skip_risk: number | null; consistency_30d: number })[]
-  userId: string
+  habits:  (Habit & { today_log: any; skip_risk: number | null; consistency_30d: number })[]
+  userId:  string
+  streak:  number
 }
 
 type SkipReason = 'forgot' | 'too_tired' | 'too_busy' | 'unmotivated' | 'sick' | 'traveling' | 'other'
 
-const SKIP_REASONS: { value: SkipReason; label: string; emoji: string }[] = [
-  { value: 'forgot',      label: 'Forgot',        emoji: '😅' },
-  { value: 'too_tired',   label: 'Too tired',     emoji: '😴' },
-  { value: 'too_busy',    label: 'Too busy',      emoji: '🏃' },
-  { value: 'unmotivated', label: 'No motivation', emoji: '😶' },
-  { value: 'sick',        label: 'Not feeling well', emoji: '🤒' },
-  { value: 'traveling',   label: 'Traveling',     emoji: '✈️' },
-  { value: 'other',       label: 'Other',         emoji: '🔸' },
+const SKIP_REASONS: { value: SkipReason; label: string; icon: string }[] = [
+  { value: 'forgot',      label: 'Forgot',           icon: '😅' },
+  { value: 'too_tired',   label: 'Too tired',        icon: '😴' },
+  { value: 'too_busy',    label: 'Too busy',         icon: '🏃' },
+  { value: 'unmotivated', label: 'No motivation',    icon: '😶' },
+  { value: 'sick',        label: 'Not feeling well', icon: '🤒' },
+  { value: 'traveling',   label: 'Traveling',        icon: '✈️' },
+  { value: 'other',       label: 'Other',            icon: '•••' },
 ]
 
-const MOTIVATIONAL_QUOTES = [
+const QUOTES = [
   "Small steps, big changes.",
   "Consistency beats intensity.",
   "Progress, not perfection.",
   "Every rep counts.",
   "You showed up. That's everything.",
-  "Champions are made in the off days.",
-  "One day or day one. You decide.",
+  "Champions are made on the hard days.",
+  "One day or day one — you decide.",
 ]
 
-const MILESTONE_MESSAGES: Record<number, string> = {
-  3:  '3-day streak! 🔥 You're building momentum.',
-  7:  '1 week strong! 🌟 Habit is forming.',
-  14: '2 weeks! 💪 This is becoming part of you.',
-  21: '21 days! 🧠 Science says it's a habit now.',
-  30: '30 days! 🏆 You're in the top 1%.',
-  50: '50 days! 🚀 Unstoppable.',
-  100: '100 days! 👑 Legendary.',
+const MILESTONES: Record<number, { icon: string; msg: string }> = {
+  3:   { icon: '🔥', msg: '3-day streak! Momentum is building.' },
+  7:   { icon: '⭐', msg: '1 week strong! Your habit is forming.' },
+  14:  { icon: '💪', msg: '2 weeks! This is becoming part of you.' },
+  21:  { icon: '🧠', msg: '21 days! Behavioral science says it\'s a habit now.' },
+  30:  { icon: '🏆', msg: '30 days! You\'re in the top 1%.' },
+  50:  { icon: '🚀', msg: '50 days! Absolutely unstoppable.' },
+  100: { icon: '👑', msg: '100 days! Legendary consistency.' },
 }
 
-export default function TodayView({ habits: initialHabits, userId }: Props) {
+// ── SVG Icons ────────────────────────────────────────────────────────────────
+function PlusIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14"/>
+    </svg>
+  )
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden="true">
+      <path d="M9 18l6-6-6-6"/>
+    </svg>
+  )
+}
+
+function CloseIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+      <path d="M18 6L6 18M6 6l12 12"/>
+    </svg>
+  )
+}
+
+// ── Progress Summary Card ─────────────────────────────────────────────────────
+function ProgressCard({
+  done, total, streak, avgConsistency, allDone
+}: {
+  done: number; total: number; streak: number; avgConsistency: number; allDone: boolean
+}) {
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0
+
+  return (
+    <div
+      className={`card-glass p-4 transition-all duration-500 ${allDone ? 'animate-glow-pulse' : ''}`}
+      style={{
+        borderColor: allDone ? 'rgba(29,158,117,0.45)' : 'var(--glass-border)',
+      }}
+    >
+      <div className="flex items-center gap-4">
+        {/* Consistency ring */}
+        <div className="relative flex-shrink-0">
+          <ConsistencyRing done={done} total={total} size={60} />
+          <div
+            className="absolute inset-0 flex items-center justify-center"
+            aria-hidden="true"
+          >
+            <span
+              className="font-display text-sm font-bold"
+              style={{ color: 'var(--text-brand)' }}
+            >
+              {pct}%
+            </span>
+          </div>
+        </div>
+
+        {/* Text */}
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm leading-snug" style={{ color: 'var(--text-primary)' }}>
+            {allDone
+              ? 'All done today!'
+              : done === 0
+              ? 'Ready to start?'
+              : `${done} of ${total} complete`}
+          </p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+            {done === 0
+              ? 'Tap any habit below to log it'
+              : allDone
+              ? 'Incredible — keep this streak going'
+              : `${total - done} left · you've got this`}
+          </p>
+        </div>
+
+        {/* Right stats */}
+        <div className="flex-shrink-0 text-right">
+          {allDone ? (
+            <div className="text-2xl animate-bounce-in" aria-label="All done!">🏆</div>
+          ) : streak >= 3 ? (
+            <div>
+              <p className="text-base font-bold leading-none" style={{ color: '#FCD34D' }}>
+                {streak}
+              </p>
+              <p className="text-[10px] mt-0.5 uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
+                streak
+              </p>
+            </div>
+          ) : avgConsistency > 0 ? (
+            <div>
+              <p className="text-base font-bold leading-none" style={{ color: 'var(--text-brand)' }}>
+                {avgConsistency}%
+              </p>
+              <p className="text-[10px] mt-0.5 uppercase tracking-wide" style={{ color: 'var(--text-tertiary)' }}>
+                30d avg
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      {total > 0 && (
+        <div
+          className="mt-3 h-1 rounded-full overflow-hidden"
+          style={{ background: 'var(--bg-elevated)' }}
+          role="progressbar"
+          aria-valuenow={pct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`${pct}% of habits completed today`}
+        >
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{
+              width: `${pct}%`,
+              background: allDone
+                ? 'linear-gradient(90deg, #1D9E75, #4DD9AC)'
+                : 'var(--brand)',
+              boxShadow: pct > 0 ? '0 0 8px rgba(29,158,117,0.40)' : 'none',
+            }}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Skip Reason Modal ─────────────────────────────────────────────────────────
+function SkipModal({
+  habitName,
+  onSelect,
+  onCancel,
+}: {
+  habitName: string
+  onSelect: (r: SkipReason) => void
+  onCancel: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }}
+      onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Why are you skipping?"
+    >
+      <div
+        className="card-glass-elevated w-full max-w-sm animate-slide-up"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid var(--border-subtle)' }}
+        >
+          <div>
+            <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+              Why are you skipping?
+            </h3>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+              {habitName} — helps improve future predictions
+            </p>
+          </div>
+          <button
+            onClick={onCancel}
+            className="btn-icon w-8 h-8 rounded-lg"
+            aria-label="Cancel"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        {/* Reasons grid */}
+        <div className="p-4 grid grid-cols-2 gap-2">
+          {SKIP_REASONS.map(r => (
+            <button
+              key={r.value}
+              onClick={() => onSelect(r.value)}
+              className="flex items-center gap-2.5 px-3 py-3 rounded-xl text-left
+                         transition-all duration-150 active:scale-97"
+              style={{
+                background:  'var(--bg-elevated)',
+                border:      '1px solid var(--border-default)',
+                color:       'var(--text-primary)',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = 'rgba(245,158,11,0.40)'
+                e.currentTarget.style.background  = 'rgba(245,158,11,0.06)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = 'var(--border-default)'
+                e.currentTarget.style.background  = 'var(--bg-elevated)'
+              }}
+            >
+              <span className="text-lg leading-none" aria-hidden="true">{r.icon}</span>
+              <span className="text-xs font-medium">{r.label}</span>
+            </button>
+          ))}
+        </div>
+
+        <div className="px-4 pb-4">
+          <button onClick={onCancel} className="btn-ghost w-full py-3 text-sm">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Milestone Modal ───────────────────────────────────────────────────────────
+function MilestoneModal({
+  milestone,
+  onClose,
+}: {
+  milestone: { icon: string; msg: string }
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-6"
+      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Milestone reached"
+    >
+      <div
+        className="card-glass-elevated text-center p-8 max-w-xs w-full animate-scale-in"
+        onClick={e => e.stopPropagation()}
+      >
+        <div
+          className="text-6xl mb-5 animate-bounce-in"
+          aria-hidden="true"
+          style={{ lineHeight: 1 }}
+        >
+          {milestone.icon}
+        </div>
+        <h2
+          className="font-display text-2xl mb-2"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          Milestone!
+        </h2>
+        <p
+          className="text-sm leading-relaxed mb-6"
+          style={{ color: 'var(--text-secondary)' }}
+        >
+          {milestone.msg}
+        </p>
+        <button onClick={onClose} className="btn-primary w-full py-3.5">
+          Keep going →
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Empty State ───────────────────────────────────────────────────────────────
+function EmptyState({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div
+      className="text-center py-14 px-4 animate-fade-up"
+      role="region"
+      aria-label="No habits yet"
+    >
+      {/* Icon */}
+      <div
+        className="w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-5"
+        style={{
+          background: 'var(--brand-dim)',
+          border:     '1px solid var(--border-brand)',
+          boxShadow:  'var(--shadow-brand)',
+        }}
+        aria-hidden="true"
+      >
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none"
+          stroke="var(--brand)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+        >
+          <path d="M12 2C8.5 6 7 9 8 13c-2-1-3-3-2.5-5.5C2 10 1 14 3 17c1 2 3 4 6 4.5V18c0-1.5 1-3 2-4 .5 1 .5 2 0 3 2-1 3.5-3 3.5-5.5 0-3-2-5.5-2-9.5z"/>
+        </svg>
+      </div>
+
+      <h2
+        className="font-display text-2xl mb-2"
+        style={{ color: 'var(--text-primary)' }}
+      >
+        Start your journey
+      </h2>
+      <p
+        className="text-sm mb-7 max-w-xs mx-auto leading-relaxed"
+        style={{ color: 'var(--text-secondary)' }}
+      >
+        Add your first habit. In 21 days, HabitLoop will predict when you're about to slip and nudge you before it happens.
+      </p>
+
+      <button
+        onClick={onAdd}
+        className="btn-primary px-8 py-4 text-base glow-brand mx-auto"
+      >
+        Add your first habit
+      </button>
+      <p className="text-xs mt-3" style={{ color: 'var(--text-tertiary)' }}>
+        Takes less than 30 seconds
+      </p>
+    </div>
+  )
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+function Toast({ msg, type }: { msg: string; type: 'success' | 'warn' | 'info' }) {
+  return (
+    <div
+      className={`toast toast-${type}`}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      {msg}
+    </div>
+  )
+}
+
+// ── Main TodayView ────────────────────────────────────────────────────────────
+export default function TodayView({ habits: initialHabits, userId, streak }: Props) {
   const [isPending, startTransition] = useTransition()
-  const [habits, setHabits]         = useState(initialHabits)
-  const [toast, setToast]           = useState<{ msg: string; type: 'success'|'info'|'warn' } | null>(null)
-  const [confetti, setConfetti]     = useState(false)
-  const [tappedId, setTappedId]     = useState<string | null>(null)
-  const [skipModal, setSkipModal]   = useState<string | null>(null)
-  const [showAdd, setShowAdd]       = useState(false)
-  const [milestone, setMilestone]   = useState<string | null>(null)
+  const [habits,    setHabits]       = useState(initialHabits)
+  const [toast,     setToast]        = useState<{ msg: string; type: 'success' | 'warn' | 'info' } | null>(null)
+  const [confetti,  setConfetti]     = useState(false)
+  const [tappedId,  setTappedId]     = useState<string | null>(null)
+  const [skipModal, setSkipModal]    = useState<{ id: string; name: string } | null>(null)
+  const [showAdd,   setShowAdd]      = useState(false)
+  const [milestone, setMilestone]    = useState<{ icon: string; msg: string } | null>(null)
+  const [noteModal, setNoteModal]    = useState<{ habitId: string; habitName: string; status: LogStatus } | null>(null)
+  const shownMilestones = useRef<Set<number>>(new Set())
 
-  const doneCount  = habits.filter(h => h.today_log?.status === 'done').length
-  const totalCount = habits.length
-  const allDone    = doneCount === totalCount && totalCount > 0
+  const doneCount      = habits.filter(h => h.today_log?.status === 'done').length
+  const totalCount     = habits.length
+  const allDone        = doneCount === totalCount && totalCount > 0
+  const avgConsistency = Math.round(
+    habits.reduce((a, h) => a + (h.consistency_30d ?? 0), 0) / Math.max(1, totalCount)
+  )
 
+  // ── Side effects ─────────────────────────────────────────
+  // Confetti + milestone check
   useEffect(() => {
-    if (allDone && doneCount > 0) {
-      setConfetti(true)
-      setTimeout(() => setConfetti(false), 4000)
-      showToastMsg('🎉 All habits done today!', 'success')
+    if (!allDone || doneCount === 0) return
+    setConfetti(true)
+    setTimeout(() => setConfetti(false), 4500)
+    if (MILESTONES[streak] && !shownMilestones.current.has(streak)) {
+      shownMilestones.current.add(streak)
+      setTimeout(() => setMilestone(MILESTONES[streak]), 900)
     }
-  }, [allDone, doneCount])
+  }, [allDone, doneCount, streak])
 
+  // Auto-dismiss toast
   useEffect(() => {
     if (!toast) return
-    const t = setTimeout(() => setToast(null), 2500)
+    const t = setTimeout(() => setToast(null), 2600)
     return () => clearTimeout(t)
   }, [toast])
 
-  function showToastMsg(msg: string, type: 'success'|'info'|'warn' = 'success') {
+  // Auto-run prediction engine on mount (non-blocking)
+  useEffect(() => {
+    fetch('/api/predictions/run', { method: 'POST' }).catch(() => {})
+  }, [])
+
+  // ── Helpers ───────────────────────────────────────────────
+  function showToastMsg(msg: string, type: 'success' | 'warn' | 'info' = 'success') {
     setToast({ msg, type })
   }
 
+  function optimisticUpdate(habitId: string, status: LogStatus) {
+    setHabits(prev => prev.map(h =>
+      h.id === habitId
+        ? { ...h, today_log: { ...(h.today_log ?? {}), status } }
+        : h
+    ))
+  }
+
+  // ── Tap handler ───────────────────────────────────────────
   function handleTap(habit: Habit & { today_log: any }) {
     const current = habit.today_log?.status as LogStatus | undefined
-    const next: LogStatus = !current ? 'done' : current === 'done' ? 'partial' : current === 'partial' ? 'skipped' : 'done'
+    const next: LogStatus =
+      !current         ? 'done'    :
+      current === 'done'    ? 'partial' :
+      current === 'partial' ? 'skipped' : 'done'
 
+    // Animate tap
     setTappedId(habit.id)
-    setTimeout(() => setTappedId(null), 300)
+    setTimeout(() => setTappedId(null), 280)
 
-    // Haptic feedback
+    // Haptic feedback (mobile)
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) navigator.vibrate(8)
 
-    if (next === 'skipped') { setSkipModal(habit.id); return }
+    if (next === 'skipped') {
+      setSkipModal({ id: habit.id, name: habit.name })
+      return
+    }
 
-    setHabits(prev => prev.map(h => h.id === habit.id ? { ...h, today_log: { ...(h.today_log ?? {}), status: next } } : h))
-
-    const msgs = { done: `✓ ${habit.name}`, partial: `◐ Partial — still counts!` }
-    showToastMsg(msgs[next as 'done'|'partial'])
+    optimisticUpdate(habit.id, next)
+    showToastMsg(
+      next === 'done'    ? `✓ ${habit.name}` :
+      next === 'partial' ? `◐ Partial — still counts!` : ''
+    )
 
     startTransition(async () => {
       await logHabit({ habitId: habit.id, userId, status: next })
     })
   }
 
-  function handleSkipReason(habitId: string, reason: SkipReason) {
+  // ── Skip reason ───────────────────────────────────────────
+  function handleSkipReason(reason: SkipReason) {
+    if (!skipModal) return
+    const { id } = skipModal
     setSkipModal(null)
-    setHabits(prev => prev.map(h => h.id === habitId ? { ...h, today_log: { ...(h.today_log ?? {}), status: 'skipped' } } : h))
-    showToastMsg("Skip recorded. Tomorrow's a new day.", 'warn')
-    startTransition(async () => { await logHabit({ habitId, userId, status: 'skipped', skipReason: reason }) })
+    optimisticUpdate(id, 'skipped')
+    showToastMsg("Skip recorded. Tomorrow's a fresh start. 💪", 'warn')
+    startTransition(async () => {
+      await logHabit({ habitId: id, userId, status: 'skipped', skipReason: reason })
+    })
   }
 
+  // ── Archive ───────────────────────────────────────────────
   function handleArchive(habitId: string) {
     setHabits(prev => prev.filter(h => h.id !== habitId))
     showToastMsg('Habit archived', 'info')
     startTransition(async () => { await archiveHabit(habitId) })
   }
 
-  const quote = MOTIVATIONAL_QUOTES[new Date().getDay() % MOTIVATIONAL_QUOTES.length]
+  const quote = QUOTES[new Date().getDay() % QUOTES.length]
 
   return (
-    <main className="flex-1 overflow-y-auto no-scrollbar pb-32" id="habit-list" aria-label="Today's habits">
+    <main
+      className="flex-1 overflow-y-auto no-scrollbar pb-28"
+      id="habit-list"
+      aria-label="Today's habits"
+    >
       <Confetti active={confetti} />
 
       {/* Toast */}
-      {toast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-fade-up pointer-events-none" role="status" aria-live="polite">
-          <div className={`px-5 py-3 rounded-2xl text-sm font-semibold whitespace-nowrap shadow-2xl ${
-            toast.type === 'success' ? 'bg-teal-400 text-ink-900'
-            : toast.type === 'warn'  ? 'bg-amber-400 text-ink-900'
-            : 'bg-ink-700 text-ink-50'
-          }`}>
-            {toast.msg}
-          </div>
-        </div>
-      )}
+      {toast && <Toast msg={toast.msg} type={toast.type} />}
 
-      {/* Milestone celebration */}
+      {/* Milestone modal */}
       {milestone && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-6" style={{ background: 'rgba(15,14,12,0.9)', backdropFilter: 'blur(16px)' }}>
-          <div className="card text-center p-8 max-w-xs animate-scale-in">
-            <p className="text-5xl mb-4">🏆</p>
-            <h2 className="font-display text-2xl mb-3" style={{ color: 'var(--text-primary)' }}>Milestone!</h2>
-            <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>{milestone}</p>
-            <button onClick={() => setMilestone(null)} className="btn-primary w-full">Keep going →</button>
-          </div>
-        </div>
+        <MilestoneModal milestone={milestone} onClose={() => setMilestone(null)} />
       )}
 
       {/* Skip reason modal */}
       {skipModal && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center p-4" style={{ background: 'rgba(15,14,12,0.85)', backdropFilter: 'blur(12px)' }} onClick={() => setSkipModal(null)}>
-          <div className="card w-full max-w-sm animate-slide-up" onClick={e => e.stopPropagation()} role="dialog" aria-label="Skip reason">
-            <div className="p-5">
-              <h3 className="font-display text-xl mb-1" style={{ color: 'var(--text-primary)' }}>Why are you skipping?</h3>
-              <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>Helps HabitLoop prevent this in the future</p>
-              <div className="grid grid-cols-2 gap-2">
-                {SKIP_REASONS.map(r => (
-                  <button
-                    key={r.value}
-                    onClick={() => handleSkipReason(skipModal, r.value)}
-                    className="flex items-center gap-2.5 p-3 rounded-xl border transition-all text-left hover:border-amber-400/40"
-                    style={{ borderColor: 'var(--border-color)' }}
-                  >
-                    <span className="text-xl">{r.emoji}</span>
-                    <span className="text-xs" style={{ color: 'var(--text-primary)' }}>{r.label}</span>
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => setSkipModal(null)} className="btn-ghost w-full mt-3 py-2.5 text-sm">Cancel</button>
-            </div>
-          </div>
-        </div>
+        <SkipModal
+          habitName={skipModal.name}
+          onSelect={handleSkipReason}
+          onCancel={() => setSkipModal(null)}
+        />
+      )}
+
+      {/* Note modal */}
+      {noteModal && (
+        <NoteModal
+          habitId={noteModal.habitId}
+          habitName={noteModal.habitName}
+          userId={userId}
+          status={noteModal.status}
+          existingNote={habits.find(h => h.id === noteModal.habitId)?.today_log?.note}
+          onClose={() => setNoteModal(null)}
+          onSaved={() => setNoteModal(null)}
+        />
       )}
 
       <div className="px-4 pt-2 space-y-3">
-        {/* Quote */}
-        <p className="text-center text-xs italic py-1" style={{ color: 'var(--text-tertiary)' }}>"{quote}"</p>
 
-        {/* Progress card */}
+        {/* ── Motivational quote ─────────────────────────── */}
+        <p
+          className="text-center text-xs italic py-0.5"
+          style={{ color: 'var(--text-tertiary)' }}
+          aria-hidden="true"
+        >
+          "{quote}"
+        </p>
+
+        {/* ── Progress card ──────────────────────────────── */}
         {totalCount > 0 && (
-          <div
-            className={`card p-5 flex items-center gap-4 transition-all duration-500`}
-            style={{ borderColor: allDone ? 'rgba(29,158,117,0.5)' : 'var(--border-color)', boxShadow: allDone ? '0 0 30px rgba(29,158,117,0.15)' : undefined }}
-          >
-            <div className="relative flex-shrink-0">
-              <ConsistencyRing done={doneCount} total={totalCount} size={60} />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="font-display text-sm text-teal-400">{Math.round((doneCount/Math.max(totalCount,1))*100)}%</span>
-              </div>
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-                {allDone ? '🎉 All done today!' : `${doneCount} of ${totalCount} habits`}
-              </p>
-              <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                {doneCount === 0 ? 'Tap any habit to log it'
-                  : allDone ? 'Incredible consistency — you\'re building something real'
-                  : `${totalCount - doneCount} left · keep going`}
-              </p>
-            </div>
-            {allDone && <span className="text-3xl animate-bounce-in" aria-hidden="true">🏆</span>}
-          </div>
+          <ProgressCard
+            done={doneCount}
+            total={totalCount}
+            streak={streak}
+            avgConsistency={avgConsistency}
+            allDone={allDone}
+          />
         )}
 
-        {/* Habit cards */}
-        <div className="space-y-2.5" role="list" aria-label="Habit list">
-          {habits.length === 0 ? (
+        {/* ── Habit list ─────────────────────────────────── */}
+        <div className="space-y-2.5" role="list" aria-label="Habits for today">
+          {totalCount === 0 ? (
             <EmptyState onAdd={() => setShowAdd(true)} />
           ) : (
             habits.map((habit, i) => (
-              <div key={habit.id} role="listitem">
-                <HabitCard
-                  habit={habit}
-                  onTap={() => handleTap(habit)}
-                  onArchive={() => handleArchive(habit.id)}
-                  isTapped={tappedId === habit.id}
-                  index={i}
-                />
-                {habit.skip_risk !== null && habit.skip_risk >= 70 && !habit.today_log?.status && (
-                  <div className="mx-2 mt-1 px-4 py-2.5 rounded-xl border animate-fade-in" role="alert" style={{ background: 'rgba(251,191,36,0.07)', borderColor: 'rgba(251,191,36,0.2)' }}>
-                    <p className="text-amber-300 text-xs leading-relaxed">
-                      <span className="font-semibold">⚠️ Heads up —</span> based on your patterns, there's a {habit.skip_risk}% chance you'll skip this today.
-                    </p>
-                  </div>
-                )}
-              </div>
+              <HabitCard
+                key={habit.id}
+                habit={habit}
+                onTap={() => handleTap(habit)}
+                onArchive={() => handleArchive(habit.id)}
+                onNote={() => setNoteModal({
+                  habitId:   habit.id,
+                  habitName: habit.name,
+                  status:    habit.today_log?.status ?? 'done',
+                })}
+                isTapped={tappedId === habit.id}
+                index={i}
+              />
             ))
           )}
         </div>
 
-        {/* Add habit */}
+        {/* ── High-risk nudges (shown below the relevant card) ── */}
+        {habits.map(habit =>
+          habit.skip_risk !== null &&
+          habit.skip_risk >= 70 &&
+          !habit.today_log?.status ? (
+            <div
+              key={`nudge-${habit.id}`}
+              className="px-4 py-2.5 rounded-xl border animate-fade-in-sm -mt-1.5"
+              style={{
+                background:  'rgba(245,158,11,0.06)',
+                borderColor: 'rgba(245,158,11,0.22)',
+              }}
+              role="alert"
+            >
+              <p className="text-xs leading-relaxed" style={{ color: '#FCD34D' }}>
+                <span className="font-semibold">Heads up —</span>{' '}
+                there's a <strong>{habit.skip_risk}%</strong> chance you'll skip{' '}
+                <em>{habit.name}</em> today based on your patterns.
+              </p>
+            </div>
+          ) : null
+        )}
+
+        {/* ── Add habit button ───────────────────────────── */}
         {totalCount > 0 && (
           <button
             onClick={() => setShowAdd(true)}
-            className="w-full py-3.5 rounded-2xl border-2 border-dashed text-sm flex items-center justify-center gap-2 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
-            style={{ borderColor: 'var(--border-color)', color: 'var(--text-tertiary)' }}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl
+                       border-2 border-dashed transition-all duration-200 group"
+            style={{
+              borderColor: 'var(--border-default)',
+              color:       'var(--text-tertiary)',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = 'rgba(29,158,117,0.45)'
+              e.currentTarget.style.color       = 'var(--brand)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = 'var(--border-default)'
+              e.currentTarget.style.color       = 'var(--text-tertiary)'
+            }}
             aria-label="Add a new habit"
           >
-            <span className="text-lg" aria-hidden="true">+</span> Add a habit
+            <PlusIcon />
+            <span className="text-sm font-medium">Add a habit</span>
           </button>
         )}
 
-        {/* Quick stats */}
+        {/* ── Quick stats row ────────────────────────────── */}
         {totalCount > 0 && (
-          <div className="grid grid-cols-3 gap-3 pb-4" role="region" aria-label="Quick stats">
+          <div className="grid grid-cols-3 gap-2.5 pb-2" role="region" aria-label="Quick stats">
             {[
-              { label: 'Today',  value: `${doneCount}/${totalCount}`, href: '/dashboard' },
-              { label: '30d avg', value: `${Math.round(habits.reduce((a,h) => a+(h.consistency_30d??0),0)/Math.max(1,totalCount))}%`, href: '/dashboard/insights' },
-              { label: 'Habits', value: `${totalCount}`,  href: '/dashboard/insights' },
+              { label: 'Today',   value: `${doneCount}/${totalCount}`, href: '/dashboard' },
+              { label: '30d avg', value: `${avgConsistency}%`,         href: '/dashboard/insights' },
+              { label: streak >= 1 ? 'Streak' : 'Habits',
+                value: streak >= 1 ? `${streak}d`  : `${totalCount}`,
+                href: '/dashboard/insights' },
             ].map(s => (
-              <Link key={s.label} href={s.href} className="card px-3 py-3.5 text-center transition-colors hover:border-teal-400/20">
-                <p className="font-display text-xl text-teal-400">{s.value}</p>
-                <p className="text-[10px] mt-0.5 uppercase tracking-wide font-semibold" style={{ color: 'var(--text-tertiary)' }}>{s.label}</p>
+              <Link
+                key={s.label}
+                href={s.href}
+                className="card-glass flex flex-col items-center py-3 px-2
+                           transition-all duration-150 active:scale-97"
+                style={{ borderRadius: 14 }}
+              >
+                <p
+                  className="font-display text-lg leading-none"
+                  style={{ color: 'var(--text-brand)' }}
+                >
+                  {s.value}
+                </p>
+                <p
+                  className="text-[10px] mt-1 uppercase tracking-wide font-semibold"
+                  style={{ color: 'var(--text-tertiary)' }}
+                >
+                  {s.label}
+                </p>
               </Link>
             ))}
           </div>
         )}
 
-        {/* Swipe hint - first time only */}
+        {/* ── Swipe hint ─────────────────────────────────── */}
         {totalCount > 0 && (
-          <p className="text-center text-[10px] pb-2" style={{ color: 'var(--text-tertiary)' }}>
-            ← Swipe a habit to archive it
+          <p
+            className="text-center text-[10px] pb-1"
+            style={{ color: 'var(--text-disabled)' }}
+            aria-hidden="true"
+          >
+            ← Swipe a habit left to archive it
           </p>
         )}
       </div>
 
-      {showAdd && <AddHabitModal userId={userId} onClose={() => setShowAdd(false)} />}
+      {showAdd && (
+        <AddHabitModal userId={userId} onClose={() => setShowAdd(false)} />
+      )}
       <InstallBanner />
     </main>
-  )
-}
-
-function EmptyState({ onAdd }: { onAdd: () => void }) {
-  return (
-    <div className="text-center py-16 px-4 animate-fade-up" role="region" aria-label="No habits yet">
-      <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-6" style={{ background: 'rgba(29,158,117,0.1)', border: '1px solid rgba(29,158,117,0.2)' }} aria-hidden="true">✦</div>
-      <h2 className="font-display text-3xl mb-3" style={{ color: 'var(--text-primary)' }}>Start your journey</h2>
-      <p className="text-sm mb-8 max-w-xs mx-auto leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-        Add your first habit. In 21 days, HabitLoop will predict when you're about to slip and nudge you before it happens.
-      </p>
-      <button onClick={onAdd} className="btn-primary px-8 py-4 text-base glow-teal">Add your first habit</button>
-      <p className="text-xs mt-4" style={{ color: 'var(--text-tertiary)' }}>Takes less than 30 seconds</p>
-    </div>
   )
 }

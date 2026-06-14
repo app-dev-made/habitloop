@@ -36,15 +36,15 @@ const REMINDER_OPTIONS = [
 export default function OnboardingPage() {
   const router = useRouter()
   const supabase = createClient()
-  const [step, setStep] = useState<Step>('welcome')
+  const [step, setStep]         = useState<Step>('welcome')
   const [selected, setSelected] = useState<Set<number>>(new Set())
-  const [reminderTime, setReminderTime] = useState('08:00')
-  const [loading, setLoading] = useState(false)
-  const [name, setName] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [reminder, setReminder] = useState('08:00')
+  const [loading, setLoading]   = useState(false)
+  const [name, setName]         = useState('')
+  const [error, setError]       = useState<string | null>(null)
 
   const stepIndex = STEPS.indexOf(step)
-  const progress = ((stepIndex + 1) / STEPS.length) * 100
+  const progress  = ((stepIndex + 1) / STEPS.length) * 100
 
   function toggleHabit(i: number) {
     setSelected(prev => {
@@ -59,30 +59,45 @@ export default function OnboardingPage() {
     setLoading(true)
     setError(null)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push('/auth/login'); return }
+      const { data: { user }, error: userErr } = await supabase.auth.getUser()
+      if (userErr || !user) { router.push('/auth/login'); return }
 
-      // Save name to user metadata
+      // Save name to auth metadata
       if (name.trim()) {
         await supabase.auth.updateUser({ data: { name: name.trim() } })
       }
 
       // Create selected habits
       const habits = Array.from(selected).map(i => ({
-        user_id: user.id,
-        name: STARTER_HABITS[i].name,
-        category: STARTER_HABITS[i].category,
+        user_id:          user.id,
+        name:             STARTER_HABITS[i].name,
+        category:         STARTER_HABITS[i].category,
         target_frequency: STARTER_HABITS[i].freq,
-        target_time: reminderTime,
-        difficulty: 3,
-        active: true,
+        target_time:      reminder,
+        difficulty:       3,
+        active:           true,
       }))
       if (habits.length > 0) {
-        await supabase.from('habits').insert(habits)
+        const { error: habErr } = await supabase.from('habits').insert(habits)
+        if (habErr) console.warn('Habit insert error (non-fatal):', habErr.message)
       }
 
-      // Mark onboarding complete
-      await supabase.from('users').update({ onboarding_complete: true }).eq('id', user.id)
+      // Mark onboarding complete — retry up to 3 times in case trigger is slow
+      let marked = false
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { error: markErr } = await supabase
+          .from('users')
+          .update({ onboarding_complete: true })
+          .eq('id', user.id)
+        if (!markErr) { marked = true; break }
+        await new Promise(r => setTimeout(r, 600 * (attempt + 1)))
+      }
+
+      if (!marked) {
+        // Non-fatal — user can still proceed, onboarding_complete will be false
+        // but they'll land on dashboard anyway
+        console.warn('Could not mark onboarding complete — proceeding anyway')
+      }
 
       router.push('/dashboard')
     } catch (e: any) {
@@ -94,21 +109,18 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen flex flex-col max-w-lg mx-auto" style={{ background: 'var(--bg-primary)' }}>
 
-      {/* Progress */}
+      {/* Progress bar */}
       <div className="h-1" style={{ background: 'var(--bg-secondary)' }}>
         <div className="h-full bg-teal-400 transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
       </div>
 
-      {/* Step indicator */}
+      {/* Step dots */}
       <div className="flex items-center justify-center gap-2 pt-6 pb-2">
         {STEPS.map((s, i) => (
           <div
             key={s}
             className="h-1.5 rounded-full transition-all duration-300"
-            style={{
-              width: s === step ? 24 : 8,
-              background: i <= stepIndex ? '#1D9E75' : 'var(--bg-secondary)',
-            }}
+            style={{ width: s === step ? 24 : 8, background: i <= stepIndex ? '#1D9E75' : 'var(--bg-secondary)' }}
           />
         ))}
       </div>
@@ -118,42 +130,45 @@ export default function OnboardingPage() {
         {/* STEP 1: Welcome */}
         {step === 'welcome' && (
           <div className="flex-1 flex flex-col items-center justify-center text-center animate-fade-up">
-            <div className="w-24 h-24 rounded-3xl flex items-center justify-center text-5xl mb-8 glow-teal" style={{ background: 'rgba(29,158,117,0.1)', border: '1px solid rgba(29,158,117,0.2)' }}>
-              🔁
+            <div className="w-24 h-24 rounded-3xl flex items-center justify-center mb-8 glow-teal"
+              style={{ background: 'rgba(29,158,117,0.1)', border: '1px solid rgba(29,158,117,0.2)' }}
+              aria-hidden="true"
+            >
+              <img src="/icons/icon-96.png" alt="" className="w-14 h-14 rounded-xl" />
             </div>
             <h1 className="font-display text-4xl mb-4" style={{ color: 'var(--text-primary)' }}>
               Welcome to<br /><span className="gradient-text">HabitLoop</span>
             </h1>
             <p className="text-sm leading-relaxed mb-8 max-w-xs" style={{ color: 'var(--text-secondary)' }}>
-              We use behavioral science to help you build habits that actually stick — by predicting <em style={{ color: 'var(--text-primary)' }}>before</em> you slip.
+              Behavioral science meets daily habits. We predict when you'll slip — and nudge you before it happens.
             </p>
 
-            <div className="w-full max-w-xs space-y-4 mb-8">
+            <div className="w-full max-w-xs space-y-3 mb-8">
               {[
                 { icon: '⚡', text: 'One tap to log any habit' },
                 { icon: '🧠', text: 'Predicts your skip days before they happen' },
                 { icon: '📊', text: 'Real insights, not just streaks' },
               ].map(f => (
                 <div key={f.icon} className="card flex items-center gap-3 p-3.5">
-                  <span className="text-xl">{f.icon}</span>
+                  <span className="text-xl" aria-hidden="true">{f.icon}</span>
                   <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{f.text}</span>
                 </div>
               ))}
             </div>
 
             <div className="w-full max-w-xs space-y-3">
-              <div>
-                <label className="section-label block mb-2 text-left">What should we call you?</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  placeholder="Your first name (optional)"
-                  className="input text-base"
-                  autoFocus
-                  onKeyDown={e => e.key === 'Enter' && setStep('habits')}
-                />
-              </div>
+              <label className="section-label block text-left mb-1">What should we call you?</label>
+              <input
+                type="text"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                placeholder="Your first name (optional)"
+                className="input text-base"
+                autoFocus
+                maxLength={30}
+                onKeyDown={e => e.key === 'Enter' && setStep('habits')}
+                aria-label="Your first name"
+              />
               <button onClick={() => setStep('habits')} className="btn-primary w-full py-4 text-base glow-teal">
                 Let's build your habits →
               </button>
@@ -171,7 +186,7 @@ export default function OnboardingPage() {
               </p>
             </div>
 
-            <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar mb-4">
+            <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar mb-4" role="list">
               {STARTER_HABITS.map((h, i) => {
                 const isSelected = selected.has(i)
                 const isDisabled = !isSelected && selected.size >= 5
@@ -181,20 +196,23 @@ export default function OnboardingPage() {
                     key={i}
                     onClick={() => toggleHabit(i)}
                     disabled={isDisabled}
+                    role="listitem"
+                    aria-pressed={isSelected}
+                    aria-label={`${h.name} — ${cat.label}`}
                     className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all duration-150 text-left"
                     style={{
                       borderColor: isSelected ? '#1D9E75' : 'var(--border-color)',
-                      background: isSelected ? 'rgba(29,158,117,0.08)' : 'transparent',
-                      opacity: isDisabled ? 0.35 : 1,
+                      background:  isSelected ? 'rgba(29,158,117,0.08)' : 'transparent',
+                      opacity:     isDisabled ? 0.35 : 1,
                     }}
                   >
-                    <span className="text-2xl">{h.emoji}</span>
+                    <span className="text-2xl" aria-hidden="true">{h.emoji}</span>
                     <div className="flex-1">
                       <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{h.name}</p>
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cat.color}`}>{cat.label}</span>
                     </div>
                     {isSelected && (
-                      <span className="w-6 h-6 rounded-full bg-teal-400 flex items-center justify-center text-ink-900 text-xs font-bold animate-bounce-in">✓</span>
+                      <span className="w-6 h-6 rounded-full bg-teal-400 flex items-center justify-center text-ink-900 text-xs font-bold animate-bounce-in" aria-hidden="true">✓</span>
                     )}
                   </button>
                 )
@@ -204,7 +222,7 @@ export default function OnboardingPage() {
             <div className="space-y-2 pt-2">
               <div className="flex items-center justify-between px-1">
                 <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>{selected.size}/5 selected</p>
-                <div className="flex gap-1">
+                <div className="flex gap-1" aria-hidden="true">
                   {[1,2,3,4,5].map(n => (
                     <div key={n} className="w-1.5 h-1.5 rounded-full transition-colors" style={{ background: selected.size >= n ? '#1D9E75' : 'var(--border-color)' }} />
                   ))}
@@ -220,13 +238,13 @@ export default function OnboardingPage() {
           </div>
         )}
 
-        {/* STEP 3: Reminder time */}
+        {/* STEP 3: Reminder */}
         {step === 'reminder' && (
           <div className="flex-1 flex flex-col animate-fade-up">
             <div className="mb-6">
               <h2 className="font-display text-3xl mb-1" style={{ color: 'var(--text-primary)' }}>Set your reminder</h2>
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                When should HabitLoop nudge you? We'll only notify if you haven't logged yet.
+                When should we check in? We'll only notify if you haven't logged yet.
               </p>
             </div>
 
@@ -234,11 +252,12 @@ export default function OnboardingPage() {
               {REMINDER_OPTIONS.map(opt => (
                 <button
                   key={opt.time}
-                  onClick={() => setReminderTime(opt.time)}
+                  onClick={() => setReminder(opt.time)}
                   className="p-4 rounded-2xl border-2 text-left transition-all"
+                  aria-pressed={reminder === opt.time}
                   style={{
-                    borderColor: reminderTime === opt.time ? '#1D9E75' : 'var(--border-color)',
-                    background: reminderTime === opt.time ? 'rgba(29,158,117,0.08)' : 'transparent',
+                    borderColor: reminder === opt.time ? '#1D9E75' : 'var(--border-color)',
+                    background:  reminder === opt.time ? 'rgba(29,158,117,0.08)' : 'transparent',
                   }}
                 >
                   <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{opt.label}</p>
@@ -248,11 +267,12 @@ export default function OnboardingPage() {
             </div>
 
             <div className="card p-4 mb-6">
-              <label className="section-label block mb-2">Custom time</label>
+              <label className="section-label block mb-2" htmlFor="custom-time">Custom time</label>
               <input
+                id="custom-time"
                 type="time"
-                value={reminderTime}
-                onChange={e => setReminderTime(e.target.value)}
+                value={reminder}
+                onChange={e => setReminder(e.target.value)}
                 className="input text-xl font-display text-center py-3"
               />
             </div>
@@ -263,10 +283,10 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            <button onClick={handleFinish} disabled={loading} className="btn-primary w-full py-4 mt-auto glow-teal">
+            <button onClick={handleFinish} disabled={loading} className="btn-primary w-full py-4 glow-teal">
               {loading ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-ink-900/30 border-t-ink-900 rounded-full animate-spin" />
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-ink-900/30 border-t-ink-900 rounded-full animate-spin" aria-hidden="true" />
                   Setting up your habits…
                 </span>
               ) : "Let's go! 🚀"}

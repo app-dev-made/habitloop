@@ -91,7 +91,7 @@ export default function AddHabitModal({ userId, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" style={{ background: 'rgba(15,14,12,0.85)', backdropFilter: 'blur(12px)' }} onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(16px) saturate(180%)' }} onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="card w-full max-w-sm mx-4 mb-4 sm:mb-0 animate-slide-up overflow-hidden" style={{ maxHeight: '90vh', overflowY: 'auto' }}>
 
         {/* Header */}
@@ -191,7 +191,7 @@ export default function AddHabitModal({ userId, onClose }: Props) {
               <label className="section-label block mb-2">Category</label>
               <div className="grid grid-cols-4 gap-2">
                 {(Object.entries(CATEGORIES) as [HabitCategory, typeof CATEGORIES[keyof typeof CATEGORIES]][]).map(([key, cat]) => (
-                  <button key={key} type="button" onClick={() => setCategory(key)} className={`flex flex-col items-center py-2.5 rounded-xl border text-xs transition-all ${category === key ? 'border-teal-400 bg-teal-400/10 text-teal-300' : 'border-ink-600/40 text-ink-400 hover:border-ink-500'}`}>
+                  <button key={key} type="button" onClick={() => setCategory(key)} className={`flex flex-col items-center py-2.5 rounded-xl border text-xs transition-all ${category === key ? 'border-teal-400 bg-teal-400/10 text-teal-300' : 'hover:border-ink-500'}`}>
                     <span className="text-xl mb-1">{cat.emoji}</span>
                     <span className="text-[10px]">{cat.label}</span>
                   </button>

@@ -6,8 +6,8 @@ export const metadata: Metadata = {
     default: 'HabitLoop — Build Habits That Stick',
     template: '%s · HabitLoop',
   },
-  description: 'Predictive habit coaching. One tap to log, smart nudges before you fail. Free forever.',
-  keywords: ['habit tracker', 'habit coaching', 'productivity', 'self improvement', 'daily habits', 'behavior change', 'streak tracker'],
+  description: 'Predictive habit coaching. One tap to log, smart nudges before you fail. Build habits that actually last.',
+  keywords: ['habit tracker','habit coaching','productivity','self improvement','daily habits','streak tracker','behavior change'],
   authors: [{ name: 'HabitLoop' }],
   creator: 'HabitLoop',
   metadataBase: new URL('https://habitloop-rosy.vercel.app'),
@@ -64,21 +64,46 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" dir="ltr">
       <head>
+        {/* Fonts - preconnect first, then load */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=DM+Serif+Display:ital@0;1&display=swap"
+          rel="stylesheet"
+        />
+
+        {/* PWA / mobile */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="HabitLoop" />
         <meta name="application-name" content="HabitLoop" />
+
+        {/* Windows tiles */}
         <meta name="msapplication-TileColor" content="#1D9E75" />
         <meta name="msapplication-TileImage" content="/icons/icon-144.png" />
         <meta name="msapplication-config" content="/browserconfig.xml" />
+
+        {/* Apple touch icon (explicit, in addition to Next.js icons) */}
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152.png" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
+
+        {/* Apple splash screens — prevents white flash on iOS PWA launch */}
+        {/* iPhone 14 Pro Max */}
+        <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="/icons/icon-512.png" />
+        {/* iPhone 14 / 13 / 12 */}
+        <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="/icons/icon-512.png" />
+        {/* iPhone SE */}
+        <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" href="/icons/icon-256.png" />
+        {/* iPad */}
+        <link rel="apple-touch-startup-image" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)" href="/icons/icon-512.png" />
+
+        {/* Accessibility / color scheme */}
         <meta name="color-scheme" content="dark light" />
       </head>
       <body>
-        {/* Skip to content for keyboard/screen reader users */}
+        {/* Keyboard/screen-reader skip link */}
         <a href="#main-content" className="skip-link">Skip to main content</a>
 
         <div id="main-content">
@@ -86,7 +111,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         <script dangerouslySetInnerHTML={{ __html: `
-          // Restore theme before paint to avoid flash
+          // Restore theme before first paint — prevents flash
           (function() {
             try {
               var t = localStorage.getItem('theme');
@@ -98,15 +123,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
               navigator.serviceWorker.register('/sw.js', { scope: '/' })
-                .catch(function(e) { console.warn('SW registration failed:', e); });
-            });
-          }
-
-          // Register periodic background sync after SW is ready
-          if ('serviceWorker' in navigator && 'periodicSync' in window.ServiceWorkerRegistration.prototype) {
-            navigator.serviceWorker.ready.then(function(reg) {
-              reg.periodicSync.register('daily-reminder', { minInterval: 24 * 60 * 60 * 1000 })
-                .catch(function() {});
+                .then(function(reg) {
+                  // Register periodic background sync (daily reminder)
+                  if ('periodicSync' in reg) {
+                    reg.periodicSync.register('daily-reminder', {
+                      minInterval: 24 * 60 * 60 * 1000
+                    }).catch(function() {
+                      // Permission not granted — silent fail
+                    });
+                  }
+                })
+                .catch(function(err) {
+                  // SW registration failed — app still works, just no offline
+                });
             });
           }
         ` }} />

@@ -10,28 +10,26 @@ export async function POST() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Rate limit: 10 prediction runs per minute per user
-  const { success } = rateLimit(`predictions:${user.id}`, 10, 60_000)
-  if (!success) {
-    return NextResponse.json({ error: 'Too many requests. Try again in a minute.' }, { status: 429 })
-  }
+  const { success } = rateLimit(`predictions-run:${user.id}`, 5, 60_000)
+  if (!success) return NextResponse.json({ skipped: true, reason: 'rate_limited' })
 
   const todayStr      = today()
   const thirtyDaysAgo = format(subDays(new Date(), 30), 'yyyy-MM-dd')
 
+  const { data: existing } = await supabase
+    .from('predictions').select('id').eq('user_id', user.id).eq('date', todayStr).limit(1)
+
+  if (existing && existing.length > 0) {
+    return NextResponse.json({ skipped: true, reason: 'already_computed' })
+  }
+
   const { data: habits } = await supabase
-    .from('habits')
-    .select('id, target_frequency')
-    .eq('user_id', user.id)
-    .eq('active', true)
+    .from('habits').select('id, target_frequency').eq('user_id', user.id).eq('active', true)
 
   if (!habits?.length) return NextResponse.json({ predictions: [] })
 
   const { data: logs } = await supabase
-    .from('habit_logs')
-    .select('*')
-    .eq('user_id', user.id)
-    .gte('date', thirtyDaysAgo)
+    .from('habit_logs').select('*').eq('user_id', user.id).gte('date', thirtyDaysAgo)
 
   const logsByHabit = new Map<string, any[]>()
   for (const log of (logs ?? [])) {
@@ -40,22 +38,16 @@ export async function POST() {
   }
 
   const predictions = habits.map(habit => {
-    const habitLogs = logsByHabit.get(habit.id) ?? []
-    const { skipRiskScore } = computeSkipRisk({ logs: habitLogs, targetDate: new Date() })
+    const { skipRiskScore } = computeSkipRisk({
+      logs: logsByHabit.get(habit.id) ?? [],
+      targetDate: new Date(),
+    })
     return {
-      habit_id:        habit.id,
-      user_id:         user.id,
-      date:            todayStr,
-      skip_risk_score: skipRiskScore,
-      nudge_sent:      false,
-      model_version:   'v1-logistic',
+      habit_id: habit.id, user_id: user.id, date: todayStr,
+      skip_risk_score: skipRiskScore, nudge_sent: false, model_version: 'v1-logistic',
     }
   })
 
-  const { error } = await supabase
-    .from('predictions')
-    .upsert(predictions, { onConflict: 'habit_id,date' })
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ predictions })
+  await supabase.from('predictions').upsert(predictions, { onConflict: 'habit_id,date' })
+  return NextResponse.json({ predictions, computed: true })
 }

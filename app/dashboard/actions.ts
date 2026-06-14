@@ -11,12 +11,14 @@ export async function logHabit({
   status,
   skipReason,
   energyLevel,
+  note,
 }: {
-  habitId: string
-  userId: string
-  status: LogStatus
-  skipReason?: string
+  habitId:      string
+  userId:       string
+  status:       LogStatus
+  skipReason?:  string
   energyLevel?: number
+  note?:        string
 }) {
   const supabase = await createServerSupabaseClient()
 
@@ -28,8 +30,9 @@ export async function logHabit({
         user_id:      userId,
         date:         today(),
         status,
-        skip_reason:  skipReason ?? null,
+        skip_reason:  skipReason  ?? null,
         energy_level: energyLevel ?? null,
+        note:         note        ?? null,
         logged_at:    new Date().toISOString(),
       },
       { onConflict: 'habit_id,date' }
@@ -48,12 +51,12 @@ export async function createHabit({
   targetTime,
   difficulty,
 }: {
-  userId: string
-  name: string
-  category: HabitCategory
+  userId:          string
+  name:            string
+  category:        HabitCategory
   targetFrequency: number
-  targetTime: string | null
-  difficulty: number
+  targetTime:      string | null
+  difficulty:      number
 }) {
   const supabase = await createServerSupabaseClient()
 
@@ -78,7 +81,10 @@ export async function createHabit({
 
 export async function archiveHabit(habitId: string) {
   const supabase = await createServerSupabaseClient()
-  const { error } = await supabase.from('habits').update({ active: false }).eq('id', habitId)
+  const { error } = await supabase
+    .from('habits')
+    .update({ active: false })
+    .eq('id', habitId)
   if (error) return { error: error.message }
   revalidatePath('/dashboard')
   return { error: null }

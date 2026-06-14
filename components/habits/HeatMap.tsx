@@ -1,125 +1,151 @@
 'use client'
 
-import { format, subDays, getDay } from 'date-fns'
+import { format, subDays, getDay, parseISO } from 'date-fns'
 
 interface HeatMapProps {
   logs: { date: string; status: string }[]
 }
 
-const DAYS = ['S','M','T','W','T','F','S']
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 export default function HeatMap({ logs }: HeatMapProps) {
   const today = new Date()
-  const weeks = 26 // 6 months
+  today.setHours(12, 0, 0, 0) // noon to avoid DST issues
+  const WEEKS = 26
 
-  // Build log map
+  // Build log map: date → best status
   const logMap = new Map<string, string>()
-  logs.forEach(l => logMap.set(l.date, l.status))
+  logs.forEach(l => {
+    const existing = logMap.get(l.date)
+    // Priority: done > partial > skipped
+    if (!existing || (l.status === 'done') || (l.status === 'partial' && existing === 'skipped')) {
+      logMap.set(l.date, l.status)
+    }
+  })
 
-  // Build grid: weeks × 7 days
-  const grid: { date: string; status: string | null; month?: number }[][] = []
-  
-  // Start from today going back 26 weeks
-  const startDate = subDays(today, weeks * 7)
-  
-  // Find first Sunday on or before startDate
-  let current = new Date(startDate)
-  while (getDay(current) !== 0) {
-    current = subDays(current, 1)
-  }
+  // Build grid from oldest to newest
+  const startDate = subDays(today, WEEKS * 7 - 1)
+  let cursor = new Date(startDate)
+  // Align to Sunday
+  while (getDay(cursor) !== 0) cursor = subDays(cursor, 1)
 
-  for (let w = 0; w < weeks; w++) {
-    const week = []
+  const grid: { date: string; status: string | null; monthLabel?: string }[][] = []
+
+  for (let w = 0; w < WEEKS; w++) {
+    const week: typeof grid[0] = []
     for (let d = 0; d < 7; d++) {
-      const dateStr = format(current, 'yyyy-MM-dd')
-      const isFirstOfMonth = current.getDate() === 1
+      const dateStr = format(cursor, 'yyyy-MM-dd')
+      const isFirstOfMonth = cursor.getDate() <= 7 && getDay(cursor) === 0
       week.push({
-        date: dateStr,
+        date:   dateStr,
         status: logMap.get(dateStr) ?? null,
-        month: isFirstOfMonth ? current.getMonth() : undefined,
+        monthLabel: isFirstOfMonth ? MONTHS[cursor.getMonth()] : undefined,
       })
-      current = new Date(current.getTime() + 86400000)
+      cursor = new Date(cursor.getTime() + 86400000)
     }
     grid.push(week)
   }
 
-  function cellColor(status: string | null, date: string): string {
-    const d = new Date(date + 'T12:00:00')
-    if (d > today) return 'bg-ink-800/40'
-    if (!status) return 'bg-ink-800'
-    if (status === 'done') return 'bg-teal-400'
-    if (status === 'partial') return 'bg-teal-400/40'
-    if (status === 'skipped') return 'bg-red-400/40'
-    return 'bg-ink-800'
+  function cellBg(status: string | null, dateStr: string): string {
+    const d = parseISO(dateStr)
+    d.setHours(12)
+    if (d > today) return 'transparent'
+    if (status === 'done')    return '#1D9E75'
+    if (status === 'partial') return 'rgba(29,158,117,0.4)'
+    if (status === 'skipped') return 'rgba(239,68,68,0.3)'
+    return 'var(--bg-primary)'
   }
 
-  // Find month labels
-  const monthLabels: { label: string; col: number }[] = []
-  grid.forEach((week, wi) => {
-    week.forEach(day => {
-      if (day.month !== undefined) {
-        monthLabels.push({ label: MONTHS[day.month], col: wi })
-      }
-    })
-  })
+  function cellBorder(status: string | null, dateStr: string): string {
+    const d = parseISO(dateStr)
+    d.setHours(12)
+    if (d > today || status) return 'none'
+    return '1px solid var(--border-color)'
+  }
 
-  const doneDays = logs.filter(l => l.status === 'done').length
+  const doneDays    = logs.filter(l => l.status === 'done').length
   const partialDays = logs.filter(l => l.status === 'partial').length
 
   return (
-    <div className="card p-5">
+    <div className="card p-5" aria-label="Activity heatmap for last 6 months">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="section-label mb-1">Activity heatmap</p>
-          <p className="text-ink-500 text-xs">{doneDays} days completed · {partialDays} partial</p>
+          <p className="section-label mb-1">6-month activity</p>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+            {doneDays} days completed · {partialDays} partial
+          </p>
         </div>
-        <div className="flex items-center gap-1.5 text-ink-600 text-[10px]">
-          <span>Less</span>
-          {['bg-ink-800', 'bg-teal-400/30', 'bg-teal-400/60', 'bg-teal-400'].map(c => (
-            <div key={c} className={`w-3 h-3 rounded-sm ${c}`} />
+        <div className="flex items-center gap-1.5" aria-label="Legend: less to more completion">
+          <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>Less</span>
+          {[
+            'var(--bg-primary)',
+            'rgba(29,158,117,0.2)',
+            'rgba(29,158,117,0.5)',
+            '#1D9E75',
+          ].map((bg, i) => (
+            <div
+              key={i}
+              className="w-3 h-3 rounded-sm"
+              style={{ background: bg, border: i === 0 ? '1px solid var(--border-color)' : 'none' }}
+              aria-hidden="true"
+            />
           ))}
-          <span>More</span>
+          <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>More</span>
         </div>
       </div>
 
       <div className="overflow-x-auto no-scrollbar">
-        <div className="min-w-max">
-          {/* Month labels */}
-          <div className="flex mb-1 ml-6">
-            {grid.map((_, wi) => {
-              const label = monthLabels.find(m => m.col === wi)
-              return (
-                <div key={wi} className="w-3.5 mr-0.5 text-[9px] text-ink-600 text-center">
-                  {label?.label ?? ''}
-                </div>
-              )
-            })}
+        <div style={{ minWidth: 'max-content' }}>
+
+          {/* Month labels row */}
+          <div className="flex mb-1 pl-5">
+            {grid.map((week, wi) => (
+              <div key={wi} className="w-3.5 mr-0.5 text-[9px]" style={{ color: 'var(--text-tertiary)' }}>
+                {week[0].monthLabel ?? ''}
+              </div>
+            ))}
           </div>
 
           <div className="flex gap-0.5">
-            {/* Day labels */}
+            {/* Day-of-week labels */}
             <div className="flex flex-col gap-0.5 mr-1">
-              {DAYS.map((d, i) => (
-                <div key={i} className="w-4 h-3.5 text-[9px] text-ink-600 flex items-center justify-center">
-                  {i % 2 === 1 ? d : ''}
+              {['', 'M', '', 'W', '', 'F', ''].map((d, i) => (
+                <div
+                  key={i}
+                  className="w-4 h-3.5 flex items-center justify-center text-[9px]"
+                  style={{ color: 'var(--text-tertiary)' }}
+                  aria-hidden="true"
+                >
+                  {d}
                 </div>
               ))}
             </div>
 
-            {/* Grid */}
+            {/* Grid columns */}
             {grid.map((week, wi) => (
               <div key={wi} className="flex flex-col gap-0.5">
-                {week.map((day, di) => (
-                  <div
-                    key={di}
-                    title={`${day.date}: ${day.status ?? 'no log'}`}
-                    className={`w-3.5 h-3.5 rounded-sm transition-all duration-200 ${cellColor(day.status, day.date)}`}
-                  />
-                ))}
+                {week.map((day, di) => {
+                  const d = parseISO(day.date)
+                  d.setHours(12)
+                  const isFuture = d > today
+                  return (
+                    <div
+                      key={di}
+                      className="w-3.5 h-3.5 rounded-sm transition-colors duration-200"
+                      style={{
+                        background: isFuture ? 'transparent' : cellBg(day.status, day.date),
+                        border:     isFuture ? 'none' : cellBorder(day.status, day.date),
+                      }}
+                      title={`${day.date}: ${day.status ?? 'no log'}`}
+                      role="gridcell"
+                      aria-label={`${day.date}: ${day.status ?? 'not logged'}`}
+                    />
+                  )
+                })}
               </div>
             ))}
           </div>
+
         </div>
       </div>
     </div>

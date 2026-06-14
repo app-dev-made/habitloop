@@ -1,9 +1,9 @@
 // HabitLoop Service Worker v2
 // Full offline support, background sync, push notifications
 
-const CACHE_NAME = 'habitloop-v2'
-const STATIC_CACHE = 'habitloop-static-v2'
-const API_CACHE = 'habitloop-api-v2'
+const CACHE_NAME = 'habitloop-v3'
+const STATIC_CACHE = 'habitloop-static-v3'
+const API_CACHE = 'habitloop-api-v3'
 
 const SHELL_URLS = [
   '/',
