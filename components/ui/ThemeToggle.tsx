@@ -6,15 +6,12 @@ export default function ThemeToggle() {
   const [dark, setDark] = useState(true)
 
   useEffect(() => {
-    // Read current theme from DOM (set by layout inline script)
-    const isDark = !document.documentElement.classList.contains('light')
-    setDark(isDark)
+    setDark(!document.documentElement.classList.contains('light'))
   }, [])
 
   function toggle() {
     const next = !dark
     setDark(next)
-
     if (next) {
       document.documentElement.classList.remove('light')
       localStorage.setItem('theme', 'dark')
@@ -22,33 +19,39 @@ export default function ThemeToggle() {
       document.documentElement.classList.add('light')
       localStorage.setItem('theme', 'light')
     }
-
-    // Dispatch event so any listeners can react
     window.dispatchEvent(new CustomEvent('themechange', { detail: { dark: next } }))
   }
 
   return (
     <button
       onClick={toggle}
-      className="relative flex items-center w-12 h-6 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400"
-      style={{ background: dark ? '#1E1D1A' : '#E8E6DF', border: '1px solid var(--border-color)' }}
-      aria-label={`Switch to ${dark ? 'light' : 'dark'} mode`}
-      aria-pressed={!dark}
+      className="relative flex items-center transition-all duration-300"
+      style={{
+        width:        48,
+        height:       26,
+        borderRadius: 13,
+        background:   dark ? 'var(--bg-elevated)' : '#E8E6DF',
+        border:       '1px solid var(--border-default)',
+        padding:      2,
+      }}
       role="switch"
+      aria-checked={!dark}
+      aria-label={`Switch to ${dark ? 'light' : 'dark'} mode`}
     >
       <span
-        className="absolute w-5 h-5 rounded-full flex items-center justify-center text-xs transition-all duration-300 shadow-sm"
+        className="flex items-center justify-center rounded-full text-xs transition-all duration-300"
         style={{
-          background:  dark ? '#1D9E75' : '#FFB800',
-          left:        dark ? 2 : 'calc(100% - 22px)',
-          top:         '50%',
-          transform:   'translateY(-50%)',
+          width:      20,
+          height:     20,
+          background: dark ? 'var(--brand)' : '#FFB800',
+          transform:  dark ? 'translateX(0)' : 'translateX(22px)',
+          boxShadow:  dark ? '0 0 8px rgba(29,158,117,0.40)' : '0 0 8px rgba(255,184,0,0.40)',
         }}
         aria-hidden="true"
       >
         {dark ? '🌙' : '☀️'}
       </span>
-      <span className="sr-only">{dark ? 'Dark mode on' : 'Light mode on'}</span>
+      <span className="sr-only">{dark ? 'Dark mode active' : 'Light mode active'}</span>
     </button>
   )
 }

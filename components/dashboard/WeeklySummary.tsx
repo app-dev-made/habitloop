@@ -1,15 +1,17 @@
 'use client'
 
-import { format, getDay, subDays } from 'date-fns'
+import { format, subDays, getDay } from 'date-fns'
 import Link from 'next/link'
 
 interface Props {
-  logs: { date: string; status: string }[]
+  logs:       { date: string; status: string }[]
   habitCount: number
 }
 
+const DAY_LABELS = ['S','M','T','W','T','F','S']
+
 export default function WeeklySummary({ logs, habitCount }: Props) {
-  const today   = new Date()
+  const today    = new Date()
   const isSunday = getDay(today) === 0
 
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -19,57 +21,87 @@ export default function WeeklySummary({ logs, habitCount }: Props) {
     const done    = dayLogs.filter(l => l.status === 'done').length
     const rate    = habitCount > 0 ? Math.round((done / habitCount) * 100) : 0
     return {
-      label:   format(d, 'EEE'),
-      date:    dateStr,
+      label:    DAY_LABELS[getDay(d)],
+      dateStr,
       rate,
       done,
-      isToday: i === 6,
+      isToday:  i === 6,
       isFuture: d > today,
     }
   })
 
-  const weekAvg    = Math.round(days.reduce((a, d) => a + d.rate, 0) / 7)
-  const bestDay    = [...days].filter(d => !d.isFuture).sort((a, b) => b.rate - a.rate)[0]
-  const maxBarPx   = 56 // fixed pixel height of bar container
+  const weekAvg = Math.round(days.reduce((a, d) => a + d.rate, 0) / 7)
+  const bestDay = [...days].filter(d => !d.isFuture && d.done > 0).sort((a, b) => b.rate - a.rate)[0]
+  const MAX_H   = 48 // px — fixed bar container height
+
+  const moodEmoji =
+    weekAvg >= 80 ? '🔥' :
+    weekAvg >= 55 ? '📈' :
+    weekAvg >= 25 ? '💪' : '🌱'
+  const moodLabel =
+    weekAvg >= 80 ? 'On fire'   :
+    weekAvg >= 55 ? 'Building'  :
+    weekAvg >= 25 ? 'Keep going': 'Just start'
 
   return (
-    <div className="card p-5" aria-label="This week's habit summary">
-      <div className="flex items-center justify-between mb-4">
+    <div className="card-glass p-4" aria-label="This week's habit summary">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
         <div>
           <p className="section-label mb-0.5">This week</p>
           {isSunday && (
-            <p className="text-xs font-medium text-teal-400">Weekly review day 🌟</p>
+            <p className="text-xs font-semibold" style={{ color: 'var(--brand)' }}>
+              Weekly review day
+            </p>
           )}
         </div>
         <Link
           href="/dashboard/insights"
-          className="text-xs font-semibold text-teal-400 hover:text-teal-300 transition-colors"
+          className="flex items-center gap-1 text-xs font-semibold transition-colors"
+          style={{ color: 'var(--text-brand)' }}
           aria-label="View full insights"
         >
-          Full insights →
+          Full view
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"
+            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6 4l4 4-4 4"/>
+          </svg>
         </Link>
       </div>
 
-      {/* Bar chart - fixed px height for accuracy */}
-      <div className="flex items-end gap-1.5 mb-2" style={{ height: maxBarPx }} aria-hidden="true">
-        {days.map(day => {
-          const barH = day.isFuture ? 0 : Math.max(Math.round((day.rate / 100) * maxBarPx), day.rate > 0 ? 4 : 2)
+      {/* Bar chart */}
+      <div
+        className="flex items-end gap-1.5 mb-2"
+        style={{ height: MAX_H }}
+        aria-hidden="true"
+      >
+        {days.map((day, i) => {
+          const barH = day.isFuture
+            ? 2
+            : Math.max(Math.round((day.rate / 100) * MAX_H), day.rate > 0 ? 4 : 2)
+
+          const barBg =
+            day.isFuture  ? 'var(--border-subtle)' :
+            day.isToday   ? 'var(--brand)' :
+            day.rate >= 70 ? 'rgba(29,158,117,0.60)' :
+            day.rate >= 30 ? 'rgba(29,158,117,0.30)' :
+            day.rate > 0   ? 'rgba(29,158,117,0.14)' :
+                             'var(--bg-elevated)'
+
           return (
-            <div key={day.date} className="flex-1 flex flex-col justify-end">
+            <div key={i} className="flex-1 flex flex-col justify-end">
               <div
-                className="w-full rounded-t-md transition-all duration-700 ease-out"
+                className="w-full rounded-t-md transition-all duration-700"
                 style={{
-                  height: barH,
-                  background: day.isToday
-                    ? '#1D9E75'
-                    : day.isFuture
-                    ? 'transparent'
-                    : day.rate >= 70 ? 'rgba(29,158,117,0.55)'
-                    : day.rate >= 30 ? 'rgba(29,158,117,0.28)'
-                    : 'var(--bg-primary)',
-                  border: day.isFuture || day.isToday ? 'none' : '1px solid var(--border-color)',
-                  minHeight: day.isFuture ? 0 : 2,
-                  boxShadow: day.isToday && day.rate > 0 ? '0 0 8px rgba(29,158,117,0.4)' : undefined,
+                  height:    barH,
+                  background: barBg,
+                  border:    `1px solid ${day.isFuture ? 'var(--border-subtle)' : day.rate === 0 ? 'var(--border-subtle)' : 'transparent'}`,
+                  boxShadow: day.isToday && day.rate > 0
+                    ? '0 0 8px rgba(29,158,117,0.45)'
+                    : 'none',
+                  minHeight: 2,
                 }}
               />
             </div>
@@ -78,12 +110,12 @@ export default function WeeklySummary({ logs, habitCount }: Props) {
       </div>
 
       {/* Day labels */}
-      <div className="flex gap-1.5 mb-4">
-        {days.map(day => (
-          <div key={day.date} className="flex-1 text-center">
+      <div className="flex gap-1.5 mb-3">
+        {days.map((day, i) => (
+          <div key={i} className="flex-1 text-center">
             <span
               className="text-[9px] font-bold"
-              style={{ color: day.isToday ? '#1D9E75' : 'var(--text-tertiary)' }}
+              style={{ color: day.isToday ? 'var(--brand)' : 'var(--text-tertiary)' }}
             >
               {day.label}
             </span>
@@ -91,32 +123,32 @@ export default function WeeklySummary({ logs, habitCount }: Props) {
         ))}
       </div>
 
-      {/* Summary row */}
+      {/* Summary stats */}
       <div
-        className="grid grid-cols-3 gap-4 pt-3"
-        style={{ borderTop: '1px solid var(--border-color)' }}
+        className="grid grid-cols-3 gap-3 pt-3"
+        style={{ borderTop: '1px solid var(--border-subtle)' }}
       >
         <div className="text-center">
-          <p className="font-display text-2xl text-teal-400">{weekAvg}%</p>
-          <p className="text-[10px] uppercase font-semibold tracking-wide mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-            Week avg
+          <p
+            className="font-display text-xl leading-none"
+            style={{ color: 'var(--text-brand)' }}
+          >
+            {weekAvg}%
           </p>
+          <p className="section-label mt-1">Week avg</p>
         </div>
         <div className="text-center">
-          <p className="font-display text-2xl" style={{ color: 'var(--text-primary)' }}>
+          <p
+            className="font-display text-xl leading-none"
+            style={{ color: 'var(--text-primary)' }}
+          >
             {bestDay?.label ?? '—'}
           </p>
-          <p className="text-[10px] uppercase font-semibold tracking-wide mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-            Best day
-          </p>
+          <p className="section-label mt-1">Best day</p>
         </div>
         <div className="text-center">
-          <p className="text-2xl">
-            {weekAvg >= 80 ? '🔥' : weekAvg >= 50 ? '📈' : weekAvg >= 20 ? '💪' : '🌱'}
-          </p>
-          <p className="text-[10px] uppercase font-semibold tracking-wide mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-            {weekAvg >= 80 ? 'On fire' : weekAvg >= 50 ? 'Building' : weekAvg >= 20 ? 'Keep going' : 'Just start'}
-          </p>
+          <p className="text-xl leading-none" aria-hidden="true">{moodEmoji}</p>
+          <p className="section-label mt-1">{moodLabel}</p>
         </div>
       </div>
     </div>
